@@ -14,7 +14,6 @@ var moment = require('moment')
 const crypto = require('crypto');
 const secret = 'abcdefg';
 
-
 var pusher = new Pusher({
     appId: '653821',
     key: 'c83c4aa3faaa3f673bf7',
@@ -112,7 +111,7 @@ var currentUser;
 
 app.post('/login', (req, res) => {
     const myModel = mongoose.model('User');
-    myModel.findOne({ name: req.body.name, password:req.body.password }, function (err, user) {
+    myModel.findOne({ name: req.body.name, password: crypto.createHmac('sha256', secret).update(req.body.password).digest('hex')}, function (err, user) {
         if (err) {
             res.send("Error user not found");
         }
@@ -130,15 +129,27 @@ app.post('/login', (req, res) => {
                 name: req.body.name,
                 password: crypto.createHmac('sha256', secret)
                 .update(req.body.password)
-                .digest('hex')
+                 .digest('hex')
               });
-            newuser.save(function(err) {
-                if (err) throw err;
-                console.log('User saved successfully!');
+
+            myModel.findOne({ name: newuser.name}, function (err, user) {
+                if (err) {
+                    res.send("Error user not found");
+                }
+                if (user) {
+                    console.log("Este usuario ya existe => "+ newuser.name);
+                } else {
+                    newuser.save(function(err) {
+                        if (err) throw err;
+                        console.log('User saved successfully!');
+                    });
+                    currentUser = newuser;
+                    createToken(currentUser)
+                    res.status(200).send(newuser)
+                }                
+
             });
-            currentUser = newuser;
-            createToken(currentUser)
-            res.status(200).send(newuser)
+
         }
     });
 
@@ -199,6 +210,8 @@ app.post('/send-message', (req, res) => {
 var port = process.env.PORT || 5000;
 app.listen(port);
 console.log("Server is up");
+
+
 
 
 
