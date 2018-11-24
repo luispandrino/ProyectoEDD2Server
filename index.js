@@ -7,6 +7,11 @@ var app = express();
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+var jwt_express = require('express-jwt');
+var jwt = require('jwt-simple');
+var jwt_decode = require('jwt-decode');
+var moment = require('moment')
+
 
 var pusher = new Pusher({
     appId: '653821',
@@ -25,6 +30,46 @@ const userSchema = new Schema({
   });
 var User = mongoose.model('User', userSchema);
 
+function createToken(User){
+    const payload = {
+      Username: User.name,
+      Password: User.password,
+      Ini: moment().unix(),
+      Exp: moment().add(3,'m').unix()
+    };               
+    var token = jwt.encode(payload,"EST");
+      if (typeof localStorage === "undefined" || localStorage === null) {
+        var LocalStorage = require('node-localstorage').LocalStorage;
+        localStorage = new LocalStorage('./scratch');
+      }
+      localStorage.setItem('jwt',JSON.stringify(token));
+  }
+
+
+  function checkTokenExpiration (){
+    console.log("CHECK TOKEN");
+    try{
+    var LocalStorage = require('node-localstorage').LocalStorage;
+    localStorage = new LocalStorage('./scratch');
+   
+    const token = localStorage.getItem('jwt');
+    console.log("checkTokenExpiration: token => " + token);
+    if(token == null){return false;}
+    var payload = JSON.stringify(jwt.decode(JSON.parse(token),'EST'));
+    console.log("checkTokenExpiration: payload => " + payload);
+    var Token = JSON.parse(payload);
+    console.log("Expiration => "+ Token.Exp);
+    console.log("DAte      = > "+Date.now() / 1000);
+    if (Token.Exp < Date.now() / 1000) {
+      //force logout action here...
+      localStorage.clear();
+      console.log("jwt => exprirado");
+      return false;
+    }
+    console.log("jwt => sigue en linea");
+    return true;}
+    catch (e){return false;}
+  }
 
 const MessageSchema = new Schema({
     namesender: { type: String, required: true, },
@@ -73,6 +118,7 @@ app.post('/login', (req, res) => {
             // user exists already
             currentUser = user;
             currentUser.password = req.body.password
+            createToken(currentUser)
             res.status(200).send(user)
         } else {
             // create new user
@@ -85,6 +131,7 @@ app.post('/login', (req, res) => {
                 console.log('User saved successfully!');
             });
             currentUser = newuser;
+            createToken(currentUser)
             res.status(200).send(newuser)
         }
     });
@@ -98,6 +145,16 @@ app.get('/users', (req, res) => {
         if (err) throw err;
         // object of all the users
         res.send(users);
+      });
+})
+
+
+// fetch all users
+app.get('/messages', (req, res) => {
+    message.find({}, function(err, users) {
+        if (err) throw err;
+        // object of all the users
+        res.send(message);
       });
 })
 
@@ -119,6 +176,7 @@ app.post('/pusher/auth/private', (req, res) => {
 });
 
 app.post('/send-message', (req, res) => {
+    if(checkTokenExpiration()){
     pusher.trigger(req.body.channel_name, 'new-message', {message: req.body.message,sender_id: req.body.sender_id});
     res.sendStatus(200);
     var newmessage = new message({
@@ -129,8 +187,11 @@ app.post('/send-message', (req, res) => {
         if (err) throw err;
     });
     console.log('mensaje enviado!');
+}
 });
 
 var port = process.env.PORT || 5000;
 app.listen(port);
 console.log("Server is up");
+
+
