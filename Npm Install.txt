@@ -1,0 +1,1 @@
+npm install  express body-parser mongoose pusher node-localstorage express-jwt jwt-decode jwt-simple moment
