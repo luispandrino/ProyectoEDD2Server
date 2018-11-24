@@ -11,6 +11,8 @@ var jwt_express = require('express-jwt');
 var jwt = require('jwt-simple');
 var jwt_decode = require('jwt-decode');
 var moment = require('moment')
+const crypto = require('crypto');
+const secret = 'abcdefg';
 
 
 var pusher = new Pusher({
@@ -117,14 +119,18 @@ app.post('/login', (req, res) => {
         if (user) {
             // user exists already
             currentUser = user;
-            currentUser.password = req.body.password
+            currentUser.password = crypto.createHmac('sha256', secret)
+            .update(req.body.password)
+            .digest('hex')
             createToken(currentUser)
             res.status(200).send(user)
         } else {
             // create new user
             var newuser = new User({
                 name: req.body.name,
-                password: req.body.password
+                password: crypto.createHmac('sha256', secret)
+                .update(req.body.password)
+                .digest('hex')
               });
             newuser.save(function(err) {
                 if (err) throw err;
@@ -193,5 +199,6 @@ app.post('/send-message', (req, res) => {
 var port = process.env.PORT || 5000;
 app.listen(port);
 console.log("Server is up");
+
 
 
